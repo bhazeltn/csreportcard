@@ -21,16 +21,25 @@ def process_reports(directory_path):
                 print(f"Unknown report type for {filename}")
     missing_ribbons, missing_badges = validate_achievements(evaluations_df, achievements_df)
     
-    print (missing_ribbons)
-    print (missing_badges)
+    #print (missing_ribbons)
+    #print (missing_badges)
     
     #print ("achievements_df")
     #for column in achievements_df.columns:
     #    print(column)
-    #print("evaluations_df")
-    #evaluations_df.to_csv('./test.csv')
-    #for column in evaluations_df.columns:
-    #    print(column)
+    print("evaluations_df")
+    evaluations_df.to_csv('./test.csv')
+    for column in evaluations_df.columns:
+        print(column)
+    
+    column_names = [col for col in evaluations_df.columns if col != 'Skater Name']
+
+    # Convert the list of column names to a DataFrame
+    columns_df = pd.DataFrame(column_names, columns=['Skill Names'])
+
+    # Save the DataFrame to a CSV file
+    columns_df.to_csv('skill_names.csv', index=False)
+    
     
     
 
