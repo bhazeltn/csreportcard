@@ -5,3 +5,5 @@ __pycache__/
 .vscode/
 # Exclude Excel files
 *.xlsx
+#exclude any files called test
+test.*
