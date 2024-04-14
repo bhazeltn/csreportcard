@@ -1,0 +1,7 @@
+.csreportcard_venv/
+.venv/
+*.pyc
+__pycache__/
+.vscode/
+# Exclude Excel files
+*.xlsx
