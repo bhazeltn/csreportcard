@@ -3,7 +3,7 @@ import pandas as pd
 from app.data_processing.identify_report_type import identify_report_type
 from app.data_processing.achievements_report import process_achievements
 from app.data_processing.evaluations_report import process_evaluations
-from app.data_processing.validations import validate_achievements
+from app.data_processing.validations import validate_achievements, load_skill_requirements, verify_mapped_skills
 
 def process_reports(directory_path):
     """Process all files in the given directory."""
@@ -16,6 +16,8 @@ def process_reports(directory_path):
                 print("Achievements Processed")
             elif report_type == 'Evaluation Printouts':
                 evaluations_df = process_evaluations(file_path)
+                skills_df = load_skill_requirements("/home/bradley/development/csreportcard/skill_names.csv")
+                evaluations_df = verify_mapped_skills(evaluations_df, skills_df)
                 print("Evaluations Processed")
             else:
                 print(f"Unknown report type for {filename}")
@@ -32,16 +34,10 @@ def process_reports(directory_path):
     for column in evaluations_df.columns:
         print(column)
     
-    column_names = [col for col in evaluations_df.columns if col != 'Skater Name']
-
-    # Convert the list of column names to a DataFrame
-    columns_df = pd.DataFrame(column_names, columns=['Skill Names'])
-
-    # Save the DataFrame to a CSV file
-    columns_df.to_csv('skill_names.csv', index=False)
-    
     
     
 
 directory_path = '/home/bradley/development/csreportcard/data/uploads'
 process_reports(directory_path)
+
+

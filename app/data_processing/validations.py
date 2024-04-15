@@ -62,3 +62,53 @@ def missing_achievements(df, stages=[1, 2, 3, 4, 6]):
             missing_credits_list.append(skater_info)
 
     return pd.DataFrame(missing_credits_list)
+
+def load_skill_requirements(file_path):
+    skill_df = pd.read_csv(file_path)
+    
+    # Splitting the 'Variations Required' into two separate columns
+    variations_split = skill_df['Variations Required'].str.split(' of ', expand=True)
+    
+    # Handle missing or malformed entries before conversion
+    variations_split[0] = pd.to_numeric(variations_split[0], errors='coerce')
+    variations_split[1] = pd.to_numeric(variations_split[1], errors='coerce')
+    
+    # Fill NaN values with a default value or handle them according to your requirements
+    variations_split[0] = variations_split[0].fillna(0)  # Example: setting defaults to 0
+    variations_split[1] = variations_split[1].fillna(1)  # Assuming at least one variation exists as default
+
+    skill_df['Variations Needed'] = variations_split[0].astype(int)
+    skill_df['Total Variations'] = variations_split[1].astype(int)
+    
+    # Filter out all 1 variation skills
+    skill_df = skill_df[~((skill_df['Variations Needed'] == 1) & (skill_df['Total Variations'] == 1))]
+    
+    return skill_df
+
+def verify_mapped_skills(evaluations_df, skill_df):
+    # Adding new mapped skills with initial false values
+    for skill in skill_df['Mapped Skill Name'].unique():
+        evaluations_df[skill] = False
+
+    # Iterate over each mapped skill and determine if it should be marked as complete
+    for _, row in skill_df.iterrows():
+        mapped_skill = row['Mapped Skill Name']
+        original_skills = skill_df[
+            skill_df['Mapped Skill Name'] == mapped_skill
+        ]['Skill Names']
+
+        required_variations = row['Variations Needed']
+        total_variations = row['Total Variations']
+
+        # Aggregate the results for each mapped skill based on original skills
+        for index, eval_row in evaluations_df.iterrows():
+            completed_count = sum(eval_row[skill] for skill in original_skills if skill in evaluations_df.columns)
+            # Check if the number of completed variations meets the required number
+            if completed_count >= required_variations:
+                evaluations_df.at[index, mapped_skill] = True
+
+    # Remove the original skill columns
+    original_skills_to_remove = skill_df['Skill Names'].unique()
+    evaluations_df = evaluations_df.drop(columns=[col for col in original_skills_to_remove if col in evaluations_df.columns])
+
+    return evaluations_df
