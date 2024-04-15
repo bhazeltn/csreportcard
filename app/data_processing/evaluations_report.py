@@ -87,11 +87,9 @@ def convert_evaluations_to_boolean(df):
     Returns: 
         pandas.DataFrame: The cleaned data.
     """
-    df = df.replace({'✓': True, '✓*>': True})
-
-    # Replace all NaN (including None, np.nan) values with False
-    df = df.fillna(False)
-    
+    df.replace({'✓': True, '✓*>': True}, inplace=True)
+    df = df.infer_objects()  # Infer better dtypes for objects
+    df.fillna(False, inplace=True)
     return df
 
 def load_skill_requirements(file_path):
@@ -117,29 +115,24 @@ def load_skill_requirements(file_path):
     return skill_df
 
 def verify_mapped_skills(evaluations_df, skill_df):
-    # Adding new mapped skills with initial false values
-    for skill in skill_df['Mapped Skill Name'].unique():
-        evaluations_df[skill] = False
-
+    new_skills = pd.DataFrame(index=evaluations_df.index)
+    
     # Iterate over each mapped skill and determine if it should be marked as complete
     for _, row in skill_df.iterrows():
         mapped_skill = row['Mapped Skill Name']
-        original_skills = skill_df[
-            skill_df['Mapped Skill Name'] == mapped_skill
-        ]['Skill Names']
-
+        original_skills = skill_df[skill_df['Mapped Skill Name'] == mapped_skill]['Skill Names']
+        
         required_variations = row['Variations Needed']
         total_variations = row['Total Variations']
-
+        
         # Aggregate the results for each mapped skill based on original skills
-        for index, eval_row in evaluations_df.iterrows():
-            completed_count = sum(eval_row[skill] for skill in original_skills if skill in evaluations_df.columns)
-            # Check if the number of completed variations meets the required number
-            if completed_count >= required_variations:
-                evaluations_df.at[index, mapped_skill] = True
-
+        new_skills[mapped_skill] = evaluations_df[original_skills].sum(axis=1) >= required_variations
+    
+    # Concatenate new skills DataFrame with the original evaluations DataFrame
+    evaluations_df = pd.concat([evaluations_df, new_skills], axis=1)
+    
     # Remove the original skill columns
     original_skills_to_remove = skill_df['Skill Names'].unique()
-    evaluations_df = evaluations_df.drop(columns=[col for col in original_skills_to_remove if col in evaluations_df.columns])
-
+    evaluations_df.drop(columns=[col for col in original_skills_to_remove if col in evaluations_df.columns], inplace=True)
+    
     return evaluations_df
