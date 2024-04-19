@@ -15,13 +15,13 @@ def process_reports(directory_path):
                 achievements_df = process_achievements(file_path)
                 print("Achievements Processed")
             elif report_type == 'Evaluation Printouts':
-                evaluations_df = process_evaluations(file_path, "/home/bradley/development/csreportcard/data/skill_names.csv")
+                evaluations_df = process_evaluations(file_path, "/home/bradley/development/csreportcard/data/mapping/skill_names.csv")
                 
                 print("Evaluations Processed")
             else:
                 print(f"Unknown report type for {filename}")
     
-    ribbon_requirement_df = load_ribbon_requirements("/home/bradley/development/csreportcard/data/ribbons.csv")
+    ribbon_requirement_df = load_ribbon_requirements("/home/bradley/development/csreportcard/data/mapping/ribbons.csv")
     missing_ribbons, missing_badges = validate_achievements(evaluations_df, achievements_df, ribbon_requirement_df)
     
     print (missing_ribbons)
