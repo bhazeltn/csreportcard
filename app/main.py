@@ -4,6 +4,7 @@ from app.data_processing.identify_report_type import identify_report_type
 from app.data_processing.achievements_report import process_achievements
 from app.data_processing.evaluations_report import process_evaluations
 from app.data_processing.validations import validate_achievements, load_ribbon_requirements
+from app.report_generation.report_cards import create_report_cards
 
 def process_reports(directory_path):
     """Process all files in the given directory."""
@@ -26,6 +27,9 @@ def process_reports(directory_path):
     
     print (missing_ribbons)
     print (missing_badges)
+
+    create_report_cards(evaluations_df, achievements_df, "/home/bradley/development/csreportcard/app/report_generation/templates/pdf/Report_Card_ENG.pdf",
+                        "/home/bradley/development/csreportcard/data/output" )
     
     #print ("achievements_df")
     #for column in achievements_df.columns:
