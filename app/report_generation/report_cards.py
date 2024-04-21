@@ -71,6 +71,7 @@ def map_field_name(field_name):
 
 def create_report_cards(evaluations_df, achievements_df, template_path, output_directory):
     """Generate report cards for all skaters and save them as individual PDFs."""
+    print ("hello")
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)  # Ensure the output directory exists
 

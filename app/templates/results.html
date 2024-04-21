@@ -1,0 +1,38 @@
+<!-- /app/templates/results.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Results</title>
+</head>
+<body>
+    <h1>Processing Results</h1>
+    <h2>Missing Ribbons</h2>
+    {% if missing_ribbons.empty %}
+        <p>No missing ribbons.</p>
+    {% else %}
+        <ul>
+            {% for index, row in missing_ribbons.iterrows() %}
+                <li>{{ row['Skater Name'] }}: {{ row['Ribbon'] }} - {{ row['Status'] }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <h2>Missing Badges</h2>
+    {% if missing_badges.empty %}
+        <p>No missing badges.</p>
+    {% else %}
+        <ul>
+            {% for index, row in missing_badges.iterrows() %}
+                <li>{{ row['Skater Name'] }}: {{ row['Details'] }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <!-- Link to proceed with the report card generation -->
+    <p><a href="{{ url_for('main.generate_report_cards') }}">Proceed to Generate Report Cards</a></p>
+    
+    <!-- Link to upload new files or restart the process -->
+    <p><a href="{{ url_for('main.index') }}">Upload New Files</a></p>
+</body>
+</html>

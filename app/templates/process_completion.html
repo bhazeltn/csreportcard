@@ -1,0 +1,24 @@
+<!-- /app/templates/process_completion.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Cards</title>
+</head>
+<body>
+    <h1>Report Cards</h1>
+    {% if merged_file %}
+        <h2><a href="{{ url_for('main.download_merged', filename=merged_file) }}">Download All Report Cards</a></h2>
+    {% else %}
+        <p>No merged report card available. Please ensure the report cards have been generated.</p>
+    {% endif %}
+    <h2>Individual Report Cards</h2>
+    <ul>
+        {% for file in individual_files %}
+            <li><a href="{{ url_for('main.download_individual', filename=file) }}">{{ file }}</a></li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('main.index') }}">Back to Upload</a>
+</body>
+</html>
