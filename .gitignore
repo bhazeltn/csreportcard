@@ -10,3 +10,5 @@ test.*
 data/output/
 data/report_cards/
 data/uploads/
+evaluations.csv
+achievements.csv
