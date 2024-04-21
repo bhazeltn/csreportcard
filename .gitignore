@@ -8,4 +8,5 @@ __pycache__/
 #exclude any files called test
 test.*
 data/output/
-data/report_cards
+data/report_cards/
+data/uploads/
