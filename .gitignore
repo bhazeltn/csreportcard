@@ -7,3 +7,5 @@ __pycache__/
 *.xlsx
 #exclude any files called test
 test.*
+data/output/
+data/report_cards
