@@ -32,7 +32,7 @@ def update_achievements(annotations, achievements_data, skater_name):
                     annotation.update(PdfDict(V=date_str))
 
 
-def generate_individual_report_card(evaluation_data, achievements_df, template_path, output_path):
+def generate_individual_report_card(evaluation_data, achievements_df, template_path, output_path, club_name, coach_name, report_date):
     """Generate an individual report card for a skater."""
     template_pdf = PdfReader(template_path)
     for page in template_pdf.pages:
@@ -40,6 +40,16 @@ def generate_individual_report_card(evaluation_data, achievements_df, template_p
         if annotations:
             update_evaluations(annotations, evaluation_data)
             update_achievements(annotations, achievements_df, evaluation_data['Skater Name'])
+            # Update the additional fields for Club Name, Coach Name, and Report Card Date
+            for annotation in annotations:
+                if annotation['/Subtype'] == '/Widget' and annotation['/T']:
+                    field_name = annotation['/T'].to_unicode()
+                    if field_name == 'Club_Name':
+                        annotation.update(PdfDict(V=club_name))
+                    elif field_name == 'Coach_Name':
+                        annotation.update(PdfDict(V=coach_name))
+                    elif field_name == 'Report_Card_Date':
+                        annotation.update(PdfDict(V=report_date))
     PdfWriter(output_path, trailer=template_pdf).write()  # Save the filled PDF
 
 def merge_report_cards(directory_path, output_path):
@@ -69,7 +79,7 @@ def map_field_name(field_name):
     """Map the field name from the PDF to the column names used in the dataframes."""
     return field_name.replace('_', ' ')
 
-def create_report_cards(evaluations_df, achievements_df, template_path, output_directory):
+def create_report_cards(evaluations_df, achievements_df, template_path, output_directory, club_name, coach_name, report_date):
     """Generate report cards for all skaters and save them as individual PDFs."""
     print ("hello")
     if not os.path.exists(output_directory):
@@ -82,7 +92,7 @@ def create_report_cards(evaluations_df, achievements_df, template_path, output_d
     for index, evaluation_data in evaluations_df.iterrows():
         skater_name = evaluation_data['Skater Name']
         output_path = os.path.join(individual_directory, f"{skater_name.replace(' ', '_')}_Report_Card.pdf")
-        generate_individual_report_card(evaluation_data, achievements_df, template_path, output_path)
+        generate_individual_report_card(evaluation_data, achievements_df, template_path, output_path, club_name, coach_name, report_date)
         print(f"Report card generated for {skater_name} at {output_path}")
     
     merged_path = os.path.join(output_directory, 'report_cards.pdf')

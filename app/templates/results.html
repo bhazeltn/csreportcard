@@ -1,4 +1,4 @@
-<!-- /app/templates/results.html -->
+<!-- app/templates/results.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,9 +29,17 @@
         </ul>
     {% endif %}
 
-    <!-- Link to proceed with the report card generation -->
-    <p><a href="{{ url_for('main.generate_report_cards') }}">Proceed to Generate Report Cards</a></p>
-    
+    <!-- Form to input additional details and proceed to generate report cards -->
+    <form action="{{ url_for('main.generate_report_cards') }}" method="post">
+        <label for="club_name">Club Name:</label>
+        <input type="text" id="club_name" name="club_name" required><br><br>
+        <label for="coach_name">Coach Name:</label>
+        <input type="text" id="coach_name" name="coach_name" required><br><br>
+        <label for="report_date">Report Card Date:</label>
+        <input type="date" id="report_date" name="report_date" required><br><br>
+        <input type="submit" value="Generate Report Cards">
+    </form>
+
     <!-- Link to upload new files or restart the process -->
     <p><a href="{{ url_for('main.index') }}">Upload New Files</a></p>
 </body>

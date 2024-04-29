@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enter Report Details and Comments</title>
+</head>
+<body>
+    <h1>Enter Report Details and Skater Comments</h1>
+    <form method="post">
+        <label for="club_name">Club Name:</label>
+        <input type="text" id="club_name" name="club_name" required><br><br>
+        
+        <label for="coach_name">Coach Name:</label>
+        <input type="text" id="coach_name" name="coach_name" required><br><br>
+        
+        <label for="report_date">Report Card Date:</label>
+        <input type="date" id="report_date" name="report_date" required><br><br>
+        
+        <h2>Skater Comments</h2>
+        {% for skater in skaters %}
+            <label for="comment_{{ skater.id }}">Comments for {{ skater.name }}:</label>
+            <input type="text" id="comment_{{ skater.id }}" name="comment_{{ skater.id }}"><br><br>
+        {% endfor %}
+
+        <input type="submit" value="Generate Report Cards">
+    </form>
+</body>
+</html>

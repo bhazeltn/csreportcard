@@ -61,6 +61,10 @@ def process_files():
 
 @main.route('/generate_report_cards')
 def generate_report_cards():
+    # Extract additional details from the form
+    club_name = request.form['club_name']
+    coach_name = request.form['coach_name']
+    report_date = request.form['report_date']
     # Read DataFrames from CSV
     evaluations_df = pd.read_csv('/home/bradley/development/csreportcard/data/evaluations.csv')
     achievements_df = pd.read_csv('/home/bradley/development/csreportcard/data/achievements.csv')
@@ -122,3 +126,20 @@ def clear_directory(directory_path):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(f'Failed to delete {file_path}. Reason: {e}')
+
+@main.route('/report_details', methods=['GET', 'POST'])
+def report_details():
+    if request.method == 'POST':
+        club_name = request.form['club_name']
+        coach_name = request.form['coach_name']
+        report_date = request.form['report_date']
+        comments = {skater_id: request.form.get(f'comment_{skater_id}', '') for skater_id in skater_ids}
+
+        # Proceed to generate report cards with all the details and comments
+        # Assuming you have a function that can take all these and generate PDFs
+        generate_complete_report_cards(club_name, coach_name, report_date, comments)
+        return redirect(url_for('main.process_completion'))
+
+    # Assume skaters is fetched from somewhere, like a database or session
+    skaters = get_skaters_list()
+    return render_template('report_details.html', skaters=skaters)
