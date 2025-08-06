@@ -1,12 +1,23 @@
 from app import app, db
-from app.models import Session
+from app.models import Session, Skater
 from flask import render_template, request, redirect, url_for, flash, session
 from werkzeug.utils import secure_filename
 import os
-from app.processing import validate_and_load_data, process_and_save_to_db
+import json
+import secrets
+from datetime import date
+from collections import defaultdict
+from app.processing import validate_and_load_data, process_and_save_to_db, rerun_validation
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
+def dashboard():
+    """Displays the main dashboard with a list of all sessions."""
+    sessions = Session.query.order_by(Session.report_date.desc()).all()
+    return render_template('dashboard.html', sessions=sessions)
+
+@app.route('/upload', methods=['GET', 'POST'])
 def upload_files():
+    """Handles the file upload form."""
     if request.method == 'POST':
         session_name = request.form.get('session_name')
         club_name = request.form.get('club_name')
@@ -18,19 +29,16 @@ def upload_files():
             flash('All fields and files are required.', 'error')
             return redirect(request.url)
 
-        # Secure the session name for use in the directory path
         secure_session_name = secure_filename(f"{report_date}_{session_name}")
         session_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_session_name)
         os.makedirs(session_path, exist_ok=True)
 
-        # Save the files with generic names for consistent processing
         achievements_file.save(os.path.join(session_path, "upload1.xlsx"))
         evaluations_file.save(os.path.join(session_path, "upload2.xlsx"))
         
         validation_results = validate_and_load_data(session_path, session_name)
         
         if validation_results['success']:
-            # Check if session already exists in the database
             existing_session = Session.query.filter_by(name=session_name).first()
             validation_results['session_exists'] = bool(existing_session)
 
@@ -41,7 +49,8 @@ def upload_files():
             flash(f"Validation Error: {validation_results['message']}", 'error')
             return redirect(url_for('upload_files'))
 
-    return render_template('index.html')
+    today_date = date.today().strftime('%Y-%m-%d')
+    return render_template('upload.html', today_date=today_date)
 
 @app.route('/confirm', methods=['GET', 'POST'])
 def confirm_session():
@@ -52,11 +61,10 @@ def confirm_session():
         return redirect(url_for('upload_files'))
 
     if request.method == 'POST':
-        # Check if the user confirmed to replace the data
         replace_existing = request.form.get('replace') == 'true'
         session_name = confirmation_data['form_session_name']
         
-        success = process_and_save_to_db(
+        success, new_session_id = process_and_save_to_db(
             session_path=confirmation_data['session_path'],
             session_name=session_name,
             club_name=form_data['club_name'],
@@ -64,15 +72,108 @@ def confirm_session():
             replace=replace_existing
         )
         
-        # Clear the session data regardless of outcome
         session.pop('confirmation_data', None)
         session.pop('form_data', None)
         
         if success:
             flash('Session data has been successfully saved and processed.', 'success')
-            return redirect(url_for('upload_files')) 
+            return redirect(url_for('validation_results', session_id=new_session_id)) 
         else:
-            flash('An error occurred while saving the data. The session name may already exist.', 'error')
+            flash('An error occurred while saving the data.', 'error')
             return redirect(url_for('upload_files'))
 
     return render_template('confirm.html', data=confirmation_data)
+
+@app.route('/session/<int:session_id>/validation')
+def validation_results(session_id):
+    session_obj = Session.query.get_or_404(session_id)
+    results = json.loads(session_obj.validation_results) if session_obj.validation_results else []
+    return render_template('validation_results.html', session=session_obj, results=results)
+
+@app.route('/autofix_achievement', methods=['POST'])
+def autofix_achievement():
+    session_id = request.form.get('session_id')
+    skater_name = request.form.get('skater_name')
+    ribbon_name = request.form.get('ribbon_name')
+    suggested_date = request.form.get('suggested_date')
+
+    skater = Skater.query.filter_by(session_id=session_id, name=skater_name).first()
+    if skater:
+        skater_data = json.loads(skater.skater_data)
+        
+        parts = ribbon_name.split(' ')
+        achievement_col_name = f"CanSkate {parts[1]} - {parts[0]}"
+        
+        skater_data[achievement_col_name] = suggested_date
+        skater.skater_data = json.dumps(skater_data)
+        db.session.commit()
+        
+        rerun_validation(session_id)
+        flash(f"Achievement for {skater_name} has been auto-fixed.", 'success')
+    else:
+        flash("Could not find the specified skater to apply the fix.", 'error')
+
+    return redirect(url_for('validation_results', session_id=session_id))
+
+@app.route('/session/<int:session_id>')
+def session_detail(session_id):
+    """Displays the details of a session, with skaters grouped by their on-ice group."""
+    session_obj = Session.query.get_or_404(session_id)
+    skaters = session_obj.skaters
+    
+    skaters_by_group = defaultdict(list)
+    for skater in skaters:
+        skaters_by_group[skater.group_name].append(skater)
+        
+    return render_template('session_detail.html', session=session_obj, skaters_by_group=skaters_by_group)
+
+@app.route('/skater/<int:skater_id>/report')
+def skater_report_card(skater_id):
+    """Displays a basic HTML version of a skater's report card."""
+    skater = Skater.query.get_or_404(skater_id)
+    skater_data = json.loads(skater.skater_data)
+    return render_template('skater_report_card.html', skater=skater, data=skater_data)
+
+@app.route('/generate_magic_link', methods=['POST'])
+def generate_magic_link():
+    """Generates a unique token for a group of skaters."""
+    session_id = request.form.get('session_id')
+    group_name = request.form.get('group_name')
+    
+    token = secrets.token_urlsafe(16)
+    
+    skaters = Skater.query.filter_by(session_id=session_id, group_name=group_name).all()
+    for skater in skaters:
+        skater.assigned_coach_token = token
+    db.session.commit()
+    
+    flash(f"Magic link generated for group: {group_name}", "success")
+    return redirect(url_for('session_detail', session_id=session_id))
+
+@app.route('/coach/<token>', methods=['GET', 'POST'])
+def coach_view(token):
+    """Displays the coach's view for entering comments."""
+    skaters = Skater.query.filter_by(assigned_coach_token=token).order_by(Skater.name).all()
+    if not skaters:
+        return "Invalid or expired link.", 404
+
+    if request.method == 'POST':
+        for skater in skaters:
+            skater.coach_comments = request.form.get(f'comments_{skater.id}')
+        db.session.commit()
+        flash("Comments have been saved.", "success")
+        return redirect(url_for('coach_view', token=token))
+
+    # Prepare data for the template, including parsed JSON for each skater
+    skaters_with_data = []
+    for skater in skaters:
+        skaters_with_data.append({
+            'id': skater.id,
+            'name': skater.name,
+            'coach_comments': skater.coach_comments,
+            'data': json.loads(skater.skater_data)
+        })
+
+    session_name = skaters[0].session.name
+    group_name = skaters[0].group_name
+    return render_template('coach_view.html', skaters=skaters_with_data, session_name=session_name, group_name=group_name)

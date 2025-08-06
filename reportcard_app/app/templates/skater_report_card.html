@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Report Card for {{ skater.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen py-12">
+    <div class="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-8">
+        <div class="mb-6 border-b pb-4">
+            <a href="{{ url_for('session_detail', session_id=skater.session_id) }}"
+                class="text-blue-500 hover:underline">&larr; Back to Session</a>
+            <h1 class="text-3xl font-bold text-gray-800 mt-2">{{ skater.name }}</h1>
+            <p class="text-gray-600">Group: {{ skater.group_name }}</p>
+        </div>
+
+        {% include '_report_card_partial.html' %}
+
+        <div class="mt-8 border-t pt-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Coach Comments</h2>
+            {% if skater.coach_comments %}
+            <p class="text-gray-700 whitespace-pre-wrap">{{ skater.coach_comments }}</p>
+            {% else %}
+            <p class="text-gray-500">No comments have been added by the coach yet.</p>
+            {% endif %}
+        </div>
+
+    </div>
+</body>
+
+</html>

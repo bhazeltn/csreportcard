@@ -25,15 +25,18 @@
             <h2 class="text-xl font-semibold text-gray-700 mb-4">Missing Ribbon Achievements</h2>
             {% if results %}
             <p class="text-sm text-gray-500 mb-4">The following skaters appear to have completed the requirements for a
-                ribbon, but no achievement date has been recorded.</p>
+                ribbon, but no achievement date has been recorded. The system has suggested a date based on higher
+                achievements or the report card date. Please update the records in Uplifter and click "Auto-Fix" to
+                apply the changes here.</p>
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border">
                     <thead class="bg-gray-200">
                         <tr>
                             <th class="py-2 px-4 border-b text-left">Skater Name</th>
                             <th class="py-2 px-4 border-b text-left">Ribbon</th>
-                            <th class="py-2 px-4 border-b text-center">Skills Passed</th>
-                            <th class="py-2 px-4 border-b text-center">Skills Required</th>
+                            <th class="py-2 px-4 border-b text-center">Elements Passed / Required</th>
+                            <th class="py-2 px-4 border-b text-left">Suggested Date</th>
+                            <th class="py-2 px-4 border-b text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -41,10 +44,21 @@
                         <tr class="hover:bg-gray-50">
                             <td class="py-2 px-4 border-b">{{ item['Skater Name'] }}</td>
                             <td class="py-2 px-4 border-b">{{ item['Ribbon'] }}</td>
-                            <td class="py-2 px-4 border-b text-center">{{ item['Skills Passed'] }}</td>
-                            <td class="py-2 px-4 border-b text-center">{{ item['Skills Required'] }}</td>
-                            tr>
-                            {% endfor %}
+                            <td class="py-2 px-4 border-b text-center">{{ item['Skills Passed'] }} / {{ item['Skills
+                                Required'] }}</td>
+                            <td class="py-2 px-4 border-b">{{ item['Suggested Date'] }}</td>
+                            <td class="py-2 px-4 border-b text-center">
+                                <form action="{{ url_for('autofix_achievement') }}" method="post">
+                                    <input type="hidden" name="session_id" value="{{ session.id }}">
+                                    <input type="hidden" name="skater_name" value="{{ item['Skater Name'] }}">
+                                    <input type="hidden" name="ribbon_name" value="{{ item['Ribbon'] }}">
+                                    <input type="hidden" name="suggested_date" value="{{ item['Suggested Date'] }}">
+                                    <button type="submit"
+                                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">Auto-Fix</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -57,9 +71,9 @@
         </div>
 
         <div class="mt-8 text-center">
-            <a href="{{ url_for('upload_files') }}"
+            <a href="{{ url_for('dashboard') }}"
                 class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Back to Home
+                Back to Dashboard
             </a>
         </div>
     </div>

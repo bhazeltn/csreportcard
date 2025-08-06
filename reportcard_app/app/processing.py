@@ -28,7 +28,6 @@ def transform_ribbon_name(ribbon):
     ribbon = ribbon.replace("Pre-CanSkate", "PreCanSkate")
     match = re.match(r"CanSkate (\d+) - (.*)", ribbon.strip())
     if match:
-        # Swaps 'CanSkate X - Y' to 'Y X'
         return f"{match.group(2).strip()} {match.group(1).strip()}"
     return ribbon.strip()
 
@@ -40,12 +39,9 @@ def identify_report_type(file_path):
         df = pd.read_excel(file_path, header=None, sheet_name=0, nrows=5)
         first_row_values = [str(v).strip().lower() for v in df.iloc[0].values]
         if 'first name' in first_row_values and 'last name' in first_row_values:
-            app.logger.info(f"Identified {os.path.basename(file_path)} as Achievements report.")
             return 'Achievements'
         if any(isinstance(cell, str) and 'coaches:' in cell.lower() for cell in df.iloc[1].values):
-            app.logger.info(f"Identified {os.path.basename(file_path)} as Evaluations report.")
             return 'Evaluations'
-        app.logger.warning(f"Could not identify report type for {file_path}.")
         return 'Unknown'
     except Exception as e:
         app.logger.error(f"Could not read or identify report type for {file_path}: {e}")
@@ -76,7 +72,6 @@ def are_sessions_compatible(form_name, eval_name):
 
 def validate_and_load_data(session_path, form_session_name):
     """Validates uploaded files and returns data for the confirmation page."""
-    app.logger.info(f"Starting validation for session: {form_session_name}")
     file1_path = os.path.join(session_path, 'upload1.xlsx')
     file2_path = os.path.join(session_path, 'upload2.xlsx')
     file1_type = identify_report_type(file1_path)
@@ -109,7 +104,6 @@ def validate_and_load_data(session_path, form_session_name):
         eval_skaters_normalized = set(evaluations_df['Normalized Name'])
         
         common_skaters = ach_skaters_normalized.intersection(eval_skaters_normalized)
-        
         denominator = max(len(ach_skaters_normalized), len(eval_skaters_normalized))
         match_percentage = len(common_skaters) / denominator * 100 if denominator > 0 else 0
 
@@ -144,17 +138,13 @@ def get_skater_list_from_evaluations(file_path):
 
 def process_and_save_to_db(session_path, session_name, club_name, report_date, replace=False):
     """Processes the validated files and saves the session and skater data to the database."""
-    app.logger.info(f"Final processing and DB import for session: {session_name}")
-    
     existing_session = Session.query.filter_by(name=session_name).first()
     if existing_session:
         if replace:
-            app.logger.warning(f"Session '{session_name}' exists. Deleting old data.")
             db.session.delete(existing_session)
             db.session.commit()
         else:
-            app.logger.error(f"Session '{session_name}' already exists.")
-            return False
+            return False, None
 
     upload1_path = os.path.join(session_path, 'upload1.xlsx')
     upload2_path = os.path.join(session_path, 'upload2.xlsx')
@@ -163,53 +153,49 @@ def process_and_save_to_db(session_path, session_name, club_name, report_date, r
     evaluations_path = upload2_path if identify_report_type(upload1_path) == 'Achievements' else file1_path
 
     try:
-        # 1. Load Achievements Data
         achievements_df = pd.read_excel(achievements_path)
         achievements_df['Skater Name'] = achievements_df['First Name'] + ' ' + achievements_df['Last Name']
         achievements_df['Normalized Name'] = achievements_df['Skater Name'].apply(normalize_name)
         achievements_df = achievements_df.drop(columns=['First Name', 'Last Name', 'Skater Name'])
         
-        # 2. Load and Transform Evaluations Data
-        evals_df = load_and_transform_evaluations(evaluations_path)
+        achievements_df.columns = [re.sub(r'Stage (\d+) CanSkate', r'Stage \1', col) for col in achievements_df.columns]
 
-        # 3. Merge Transformed Data
+        evals_df = load_and_transform_evaluations(evaluations_path)
         merged_df = pd.merge(evals_df, achievements_df, on='Normalized Name', how='left')
 
-        # 4. Save to Database
-        new_session = Session(name=session_name, club_name=club_name, report_date=report_date)
+        merged_df = autofix_achievement_dates(merged_df)
+        # Generate badge dates from the corrected ribbon dates
+        merged_df = generate_badge_dates(merged_df)
+        validation_results = validate_missing_ribbons(merged_df, report_date)
+
+        new_session = Session(
+            name=session_name, 
+            club_name=club_name, 
+            report_date=report_date,
+            validation_results=json.dumps(validation_results)
+        )
         db.session.add(new_session)
         db.session.commit()
 
         for index, row in merged_df.iterrows():
             skater_data_dict = row.to_dict()
+            final_data = {k: v for k, v in skater_data_dict.items() if pd.notna(v)}
             
-            final_data = {}
-            for key, value in skater_data_dict.items():
-                if pd.isna(value) or value is None:
-                    continue
-                if isinstance(value, (bool, np.bool_)):
-                    final_data[key] = bool(value)
-                elif isinstance(value, pd.Timestamp):
-                    final_data[key] = value.strftime('%Y-%m-%d')
-                else:
-                    final_data[key] = value
-
             skater = Skater(
                 name=final_data.get('Skater Name'),
                 group_name=final_data.get('Group Name'),
                 session_id=new_session.id,
-                skater_data=json.dumps(final_data)
+                skater_data=json.dumps(final_data, default=str)
             )
             db.session.add(skater)
 
         db.session.commit()
-        app.logger.info(f"Successfully saved {len(merged_df)} skaters for session '{session_name}' to the database.")
-        return True
+        return True, new_session.id
 
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error during database import: {e}", exc_info=True)
-        return False
+        return False, None
 
 def load_and_transform_evaluations(file_path):
     """Loads, transforms, and consolidates the evaluations data from the Excel file."""
@@ -263,10 +249,8 @@ def process_skill_variations(df):
     """Consolidates skill variations into single skills, preserving all other data."""
     skill_map_df = load_mapping_df('skill_names.csv')
     
-    # Start with the identifying columns
     final_cols = ['Skater Name', 'Group Name', 'Normalized Name']
     
-    # Group the mapping file by the target 'Mapped Skill Name'
     grouped_skills = skill_map_df.groupby('Mapped Skill Name')
 
     for mapped_skill, group in grouped_skills:
@@ -276,12 +260,10 @@ def process_skill_variations(df):
         if not existing_skills:
             continue
 
-        # If it's a single skill (1 of 1), just ensure the column is kept
         if len(existing_skills) == 1:
             final_cols.append(existing_skills[0])
             continue
         
-        # If it's a multi-variation skill, calculate the new consolidated column
         try:
             variations_needed = int(group['Variations Required'].iloc[0].split(' of ')[0])
             df[mapped_skill] = df[existing_skills].sum(axis=1) >= variations_needed
@@ -289,7 +271,94 @@ def process_skill_variations(df):
         except (ValueError, IndexError):
             continue
 
-    # Return a new DataFrame with only the desired final columns
-    # Use set to remove duplicates and then convert back to list to preserve order
     final_cols = list(dict.fromkeys(final_cols))
     return df[final_cols]
+
+# --- Validation and Autofix Functions ---
+
+def autofix_achievement_dates(df):
+    """Corrects any chronological errors in achievement dates for each skater."""
+    for index, skater in df.iterrows():
+        for category in ['Agility', 'Balance', 'Control']:
+            dates = {}
+            for stage in range(1, 7):
+                col_name = f"CanSkate {stage} - {category}"
+                if col_name in skater and pd.notna(skater[col_name]):
+                    dates[stage] = pd.to_datetime(skater[col_name])
+            
+            for stage in range(6, 1, -1):
+                if stage in dates and (stage - 1) in dates:
+                    if dates[stage - 1] > dates[stage]:
+                        df.loc[index, f"CanSkate {stage - 1} - {category}"] = dates[stage]
+    return df
+
+def generate_badge_dates(df):
+    """Generates badge dates for skaters who have completed all three ribbons for a stage."""
+    for stage in range(1, 7):
+        badge_col = f"Stage {stage}"
+        agility_col = f"CanSkate {stage} - Agility"
+        balance_col = f"CanSkate {stage} - Balance"
+        control_col = f"CanSkate {stage} - Control"
+
+        # Ensure all required ribbon columns exist
+        if all(col in df.columns for col in [agility_col, balance_col, control_col]):
+            # Find rows where all three ribbons have a date
+            completed_all_ribbons = df[[agility_col, balance_col, control_col]].notna().all(axis=1)
+            
+            # For those rows, calculate the latest date
+            if completed_all_ribbons.any():
+                latest_dates = df.loc[completed_all_ribbons, [agility_col, balance_col, control_col]].max(axis=1)
+                df.loc[completed_all_ribbons, badge_col] = latest_dates
+    return df
+
+def validate_missing_ribbons(df, report_date):
+    """Validates which skaters have earned a ribbon but do not have an achievement date."""
+    ribbon_reqs = load_mapping_df('ribbons.csv')
+    missing_ribbons = []
+
+    for index, req in ribbon_reqs.iterrows():
+        ribbon_name = req['Ribbon']
+        elements_needed = req['Skills Required']
+
+        elements_for_ribbon = [col for col in df.columns if isinstance(col, str) and col.startswith(ribbon_name)]
+        if not elements_for_ribbon: continue
+
+        df['elements_passed_count'] = df[elements_for_ribbon].sum(axis=1)
+        earned_ribbon = df[df['elements_passed_count'] >= elements_needed]
+
+        for i, skater in earned_ribbon.iterrows():
+            parts = ribbon_name.split(' ')
+            category, stage = parts[0], int(parts[1])
+            achievement_col_name = f"CanSkate {stage} - {category}"
+            
+            if achievement_col_name in df.columns and pd.isna(skater.get(achievement_col_name)):
+                suggested_date = report_date
+                for next_stage in range(stage + 1, 7):
+                    next_col = f"CanSkate {next_stage} - {category}"
+                    if next_col in skater and pd.notna(skater[next_col]):
+                        suggested_date = skater[next_col]
+                        break
+
+                missing_ribbons.append({
+                    'Skater Name': skater['Skater Name'],
+                    'Ribbon': ribbon_name,
+                    'Skills Passed': int(skater['elements_passed_count']),
+                    'Skills Required': int(elements_needed),
+                    'Suggested Date': pd.to_datetime(suggested_date).strftime('%Y-%m-%d')
+                })
+    return missing_ribbons
+
+def rerun_validation(session_id):
+    """Fetches all skater data for a session, re-runs validation, and updates the session."""
+    session = Session.query.get(session_id)
+    if not session: return
+
+    skaters = session.skaters
+    skater_data_list = [json.loads(s.skater_data) for s in skaters]
+    df = pd.DataFrame(skater_data_list)
+
+    df = autofix_achievement_dates(df)
+    df = generate_badge_dates(df) # Also re-generate badge dates
+    validation_results = validate_missing_ribbons(df, session.report_date)
+    session.validation_results = json.dumps(validation_results)
+    db.session.commit()

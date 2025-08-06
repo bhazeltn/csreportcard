@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Coach Comments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .skater-link.active {
+            background-color: #e0e7ff;
+        }
+
+        /* indigo-100 */
+    </style>
+</head>
+
+<body class="bg-gray-100">
+    <div id="page-top" class="w-full max-w-6xl mx-auto py-12">
+        <div class="bg-white shadow-md rounded-lg">
+            <form method="post">
+                <div class="p-8">
+                    <div class="mb-6 border-b pb-4">
+                        <h1 class="text-2xl font-bold text-gray-800">Coach Comments</h1>
+                        <p class="text-gray-600">Session: <span class="font-semibold">{{ session_name }}</span> | Group:
+                            <span class="font-semibold">{{ group_name }}</span>
+                        </p>
+                    </div>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded"
+                        role="alert">
+                        {% for category, message in messages %}
+                        <span class="block sm:inline">{{ message }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+
+                    <div class="mb-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
+                        <p class="font-bold">How to Save</p>
+                        <p>Your comments for all skaters are saved at once. Please review your comments for each skater
+                            and click the "Save All Changes" button at the bottom when you are finished.</p>
+                    </div>
+
+                    <div class="flex space-x-8">
+                        <!-- Skater List Sidebar -->
+                        <div class="w-1/4">
+                            <h3 class="font-semibold text-lg text-gray-700 mb-2">Skaters</h3>
+                            <ul class="space-y-1">
+                                {% for skater in skaters %}
+                                <li>
+                                    <a href="#" class="skater-link block p-2 rounded hover:bg-gray-100"
+                                        data-skater-id="{{ skater.id }}">
+                                        <div class="flex justify-between items-center">
+                                            <span>{{ skater.name }}</span>
+                                            <span class="checkmark-placeholder" data-skater-id="{{ skater.id }}">
+                                                {% if skater.coach_comments %}
+                                                <span class="text-green-500 font-bold">✓</span>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                        <!-- Main Content Area -->
+                        <div class="w-3/4 pb-16">
+                            {% for skater in skaters %}
+                            <div id="skater-{{ skater.id }}-content" class="skater-content hidden">
+                                <h3 class="font-semibold text-xl text-gray-800 mb-4">{{ skater.name }}'s Report Card
+                                </h3>
+
+                                <div class="p-4 border rounded-lg bg-gray-50 mb-4">
+                                    {% with data=skater.data %}
+                                    {% include '_report_card_partial.html' %}
+                                    {% endwith %}
+                                </div>
+
+                                <div>
+                                    <label for="comments_{{ skater.id }}"
+                                        class="block text-sm font-medium text-gray-600">Comments</label>
+                                    <textarea name="comments_{{ skater.id }}" id="comments_{{ skater.id }}"
+                                        data-skater-id="{{ skater.id }}" rows="4"
+                                        class="comment-box mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ skater.coach_comments or '' }}</textarea>
+                                    <div class="text-right mt-2">
+                                        <a href="#page-top" class="text-sm text-blue-500 hover:underline">Back to
+                                            Top</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            <div id="prompt" class="text-center text-gray-500 pt-16">
+                                <p>&larr; Select a skater from the list to view their report card and add comments.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    class="sticky bottom-0 bg-white bg-opacity-90 backdrop-blur-sm p-4 border-t text-right rounded-b-lg">
+                    <button type="submit"
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline">
+                        Save All Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const skaterLinks = document.querySelectorAll('.skater-link');
+            const skaterContents = document.querySelectorAll('.skater-content');
+            const prompt = document.getElementById('prompt');
+            const commentBoxes = document.querySelectorAll('.comment-box');
+
+            skaterLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    const skaterId = this.dataset.skaterId;
+                    const targetContent = document.getElementById(`skater-${skaterId}-content`);
+
+                    prompt.classList.add('hidden');
+                    skaterContents.forEach(content => content.classList.add('hidden'));
+
+                    if (targetContent) {
+                        targetContent.classList.remove('hidden');
+                    }
+
+                    skaterLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            commentBoxes.forEach(box => {
+                box.addEventListener('input', function () {
+                    const skaterId = this.dataset.skaterId;
+                    const checkmarkPlaceholder = document.querySelector(`.checkmark-placeholder[data-skater-id='${skaterId}']`);
+
+                    if (this.value.trim() !== '') {
+                        if (!checkmarkPlaceholder.querySelector('span')) {
+                            const checkmark = document.createElement('span');
+                            checkmark.className = 'text-green-500 font-bold';
+                            checkmark.textContent = '✓';
+                            checkmarkPlaceholder.innerHTML = ''; // Clear placeholder
+                            checkmarkPlaceholder.appendChild(checkmark);
+                        }
+                    } else {
+                        checkmarkPlaceholder.innerHTML = ''; // Remove checkmark
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

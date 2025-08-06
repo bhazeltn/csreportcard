@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Session Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen py-12">
+    <div class="w-full max-w-5xl mx-auto">
+        <div class="mb-6">
+            <a href="{{ url_for('dashboard') }}" class="text-blue-500 hover:underline">&larr; Back to Dashboard</a>
+            <h1 class="text-3xl font-bold text-gray-800 mt-2">{{ session.name }}</h1>
+            <p class="text-gray-600">{{ session.report_date }}</p>
+        </div>
+
+        {% for group_name, skaters in skaters_by_group.items()|sort %}
+        <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">{{ group_name }}</h2>
+                {% if skaters[0].assigned_coach_token %}
+                <div class="text-sm flex items-center space-x-2">
+                    <span class="font-semibold">Magic Link:</span>
+                    <input type="text"
+                        value="{{ url_for('coach_view', token=skaters[0].assigned_coach_token, _external=True) }}"
+                        class="border rounded px-2 py-1 bg-gray-100 w-96" readonly>
+                </div>
+                {% else %}
+                <form action="{{ url_for('generate_magic_link') }}" method="post">
+                    <input type="hidden" name="session_id" value="{{ session.id }}">
+                    <input type="hidden" name="group_name" value="{{ group_name }}">
+                    <button type="submit"
+                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">Generate
+                        Magic Link</button>
+                </form>
+                {% endif %}
+            </div>
+            <ul>
+                {% for skater in skaters|sort(attribute='name') %}
+                <li class="mb-2 border-b last:border-b-0 py-2">
+                    <a href="{{ url_for('skater_report_card', skater_id=skater.id) }}"
+                        class="text-blue-600 hover:underline">
+                        {{ skater.name }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+
+</html>
