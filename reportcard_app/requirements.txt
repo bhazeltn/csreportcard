@@ -9,3 +9,6 @@ openpyxl
 
 # PDF Generation & Manipulation
 PyMuPDF
+
+# Database ORM
+Flask-SQLAlchemy
