@@ -1,0 +1,11 @@
+# Core Web Application
+Flask
+python-dotenv
+gunicorn
+
+# Data Processing
+pandas
+openpyxl
+
+# PDF Generation & Manipulation
+PyMuPDF
