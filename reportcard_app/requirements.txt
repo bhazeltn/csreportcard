@@ -1,5 +1,6 @@
 # Core Web Application
 Flask
+Flask-Migrate
 python-dotenv
 gunicorn
 
