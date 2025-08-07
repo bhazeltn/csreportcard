@@ -142,7 +142,46 @@
     </div>
 
     <script>
-        // ... (JavaScript remains the same)
+        document.addEventListener('DOMContentLoaded', function () {
+            const skaterLinks = document.querySelectorAll('.skater-link');
+            const skaterContents = document.querySelectorAll('.skater-content');
+            const prompt = document.getElementById('prompt');
+            const commentBoxes = document.querySelectorAll('.comment-box');
+
+            skaterLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    const skaterId = this.dataset.skaterId;
+                    const targetContent = document.getElementById(`skater-${skaterId}-content`);
+
+                    prompt.classList.add('hidden');
+                    skaterContents.forEach(content => content.classList.add('hidden'));
+
+                    if (targetContent) {
+                        targetContent.classList.remove('hidden');
+                    }
+
+                    skaterLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            commentBoxes.forEach(box => {
+                box.addEventListener('input', function () {
+                    const skaterId = this.dataset.skaterId;
+                    const checkmarkPlaceholder = document.querySelector(`.checkmark-placeholder[data-skater-id='${skaterId}']`);
+
+                    if (this.value.trim() !== '') {
+                        if (!checkmarkPlaceholder.querySelector('span.text-yellow-500')) {
+                            checkmarkPlaceholder.innerHTML = '<span class="text-yellow-500 font-bold" title="Comment Edited">…</span>';
+                        }
+                    } else {
+                        checkmarkPlaceholder.innerHTML = '';
+                    }
+                });
+            });
+        });
     </script>
 </body>
 

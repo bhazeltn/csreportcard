@@ -183,7 +183,7 @@ def coach_view(token):
 
     session_name = skaters[0].session.name
     group_name = skaters[0].group_name
-    club_name = skaters[0].session.club_name # Get the club name
+    club_name = skaters[0].session.club_name
     
     return render_template('coach_view.html', skaters=skaters_with_data, session_name=session_name, group_name=group_name, club_name=club_name)
 

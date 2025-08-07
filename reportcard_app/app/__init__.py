@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
 import logging
+import click
 
 # --- Database Setup ---
 # Get the base directory of the reportcard_app
@@ -29,3 +30,11 @@ app.config['UPLOAD_FOLDER'] = upload_folder
 
 # Import routes and models after app and db are created
 from app import routes, models
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Creates the database tables."""
+    with app.app_context():
+        db.create_all()
+    print("Initialized the database.")
+
