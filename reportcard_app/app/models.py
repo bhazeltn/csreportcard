@@ -6,7 +6,6 @@ class Session(db.Model):
     report_date = db.Column(db.String(20), nullable=False)
     club_name = db.Column(db.String(100), nullable=False)
     skaters = db.relationship('Skater', backref='session', lazy=True, cascade="all, delete-orphan")
-    # Add this field to store validation results
     validation_results = db.Column(db.Text, nullable=True)
 
 class Skater(db.Model):
@@ -16,10 +15,12 @@ class Skater(db.Model):
     
     group_name = db.Column(db.String(50), nullable=True)
 
-    # Store all evaluation and achievement data as a single JSON string
     skater_data = db.Column(db.Text, nullable=False)
     
     # Fields for coach collaboration
+    coach_name = db.Column(db.String(150), nullable=True) # New field
     coach_comments = db.Column(db.Text, nullable=True)
     recommendation = db.Column(db.String(50), nullable=True)
     assigned_coach_token = db.Column(db.String(100), nullable=True)
+    
+    comment_status = db.Column(db.String(20), nullable=True)

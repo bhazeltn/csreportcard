@@ -18,13 +18,31 @@
         <div class="mb-6">
             <a href="{{ url_for('dashboard') }}" class="text-blue-500 hover:underline">&larr; Back to Dashboard</a>
             <h1 class="text-3xl font-bold text-gray-800 mt-2">{{ session.name }}</h1>
-            <p class="text-gray-600">{{ session.report_date }}</p>
+            <p class="text-gray-600">{{ session.club_name }} | {{ session.report_date }}</p>
         </div>
 
         {% for group_name, skaters in skaters_by_group.items()|sort %}
         <div class="bg-white shadow-md rounded-lg p-6 mb-6">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-gray-700">{{ group_name }}</h2>
+                <div class="flex items-center space-x-4">
+                    <h2 class="text-xl font-semibold text-gray-700">{{ group_name }}</h2>
+
+                    {# Calculate submitted and approved counts for the group #}
+                    {% set ns = namespace(submitted_count=0) %}
+                    {% for skater in skaters %}
+                    {% if skater.coach_comments is not none and skater.coach_comments.strip() != '' %}
+                    {% set ns.submitted_count = ns.submitted_count + 1 %}
+                    {% endif %}
+                    {% endfor %}
+                    {% set approved_count = (skaters | selectattr('comment_status', 'equalto', 'Approved') | list |
+                    length) %}
+                    {% set total_skaters = skaters | length %}
+
+                    <span class="text-sm font-medium text-gray-500">{{ ns.submitted_count }} / {{ total_skaters }}
+                        Submitted</span>
+                    <span class="text-sm font-medium text-green-600">{{ approved_count }} / {{ total_skaters }}
+                        Approved</span>
+                </div>
                 {% if skaters[0].assigned_coach_token %}
                 <div class="text-sm flex items-center space-x-2">
                     <span class="font-semibold">Magic Link:</span>
@@ -45,9 +63,18 @@
             <ul>
                 {% for skater in skaters|sort(attribute='name') %}
                 <li class="mb-2 border-b last:border-b-0 py-2">
-                    <a href="{{ url_for('skater_report_card', skater_id=skater.id) }}"
+                    <a href="{{ url_for('review_comment', skater_id=skater.id) }}"
                         class="text-blue-600 hover:underline">
-                        {{ skater.name }}
+                        <div class="flex justify-between items-center">
+                            <span>{{ skater.name }}</span>
+                            {% if skater.comment_status == 'Approved' %}
+                            <span class="text-green-500 font-bold text-xl" title="Approved">✓</span>
+                            {% elif skater.comment_status == 'Rejected' %}
+                            <span class="text-red-500 font-bold text-xl" title="Rejected">✗</span>
+                            {% elif skater.comment_status == 'Pending' %}
+                            <span class="text-yellow-500 font-bold text-xl" title="Pending Review">…</span>
+                            {% endif %}
+                        </div>
                     </a>
                 </li>
                 {% endfor %}

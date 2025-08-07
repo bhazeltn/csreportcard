@@ -158,22 +158,55 @@ def coach_view(token):
         return "Invalid or expired link.", 404
 
     if request.method == 'POST':
+        coach_name = request.form.get('coach_name')
         for skater in skaters:
+            skater.coach_name = coach_name
             skater.coach_comments = request.form.get(f'comments_{skater.id}')
+            if skater.coach_comments and skater.coach_comments.strip() != '':
+                skater.comment_status = 'Pending'
+            else:
+                skater.comment_status = None
         db.session.commit()
-        flash("Comments have been saved.", "success")
+        flash("Comments have been saved and are pending review.", "success")
         return redirect(url_for('coach_view', token=token))
 
-    # Prepare data for the template, including parsed JSON for each skater
     skaters_with_data = []
-    for skater in skaters:
+    for s in skaters:
         skaters_with_data.append({
-            'id': skater.id,
-            'name': skater.name,
-            'coach_comments': skater.coach_comments,
-            'data': json.loads(skater.skater_data)
+            'id': s.id,
+            'name': s.name,
+            'coach_name': s.coach_name,
+            'coach_comments': s.coach_comments,
+            'comment_status': s.comment_status,
+            'data': json.loads(s.skater_data)
         })
 
     session_name = skaters[0].session.name
     group_name = skaters[0].group_name
-    return render_template('coach_view.html', skaters=skaters_with_data, session_name=session_name, group_name=group_name)
+    club_name = skaters[0].session.club_name # Get the club name
+    
+    return render_template('coach_view.html', skaters=skaters_with_data, session_name=session_name, group_name=group_name, club_name=club_name)
+
+@app.route('/skater/<int:skater_id>/review', methods=['GET', 'POST'])
+def review_comment(skater_id):
+    """Handles the admin's review, edit, and approval of a comment."""
+    skater = Skater.query.get_or_404(skater_id)
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        revised_comment = request.form.get('revised_comment')
+        
+        skater.coach_comments = revised_comment
+        
+        if action == 'Approve':
+            skater.comment_status = 'Approved'
+            flash(f"Comment for {skater.name} has been approved.", "success")
+        elif action == 'Reject':
+            skater.comment_status = 'Rejected'
+            flash(f"Comment for {skater.name} has been rejected. The coach will be able to revise it.", "info")
+            
+        db.session.commit()
+        return redirect(url_for('session_detail', session_id=skater.session_id))
+
+    skater_data = json.loads(skater.skater_data)
+    return render_template('review_comment.html', skater=skater, data=skater_data)
