@@ -1,0 +1,34 @@
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    {% set pcs_elements = {
+    '1': ["Fall down", "Stationary balance with eye focus", "Smile", "Stationary toe touch", "March on the spot"],
+    '2': ["Fall down - Get up (with pylon)", "FWD walking/skating (5+ steps)", "Walk around in circle", "Stationary
+    \"V\" position", "Stationary 1-foot balance (R/L)", "Side Steps (5+ steps, both directions)"],
+    '3': ["Fall down - Get up (unassisted)", "FWD walking/skating with speed", "BWD walking/skating (5+ steps)", "FWD
+    2-foot glide (2+ counts)", "Stationary 2-foot jump", "Stationary 2-foot ¼ turns"],
+    '4': ["Make snow (R/L/both feet)", "FWD skating (½ perimeter)", "BWD walking/skating with speed", "FWD 2-foot
+    sit-glide (2+ counts)", "FWD glide turn", "FWD skating with turn to BWD"]
+    } %}
+
+    {% for stage in ['1', '2', '3', '4'] %}
+    <div class="bg-stage-{{stage}} border-l-8 border-stage-{{stage}} rounded-lg p-4 shadow-md">
+        <h3 class="text-xl font-bold text-stage-{{stage}} mb-3">PreCanSkate {{ stage }}</h3>
+        <ul class="space-y-2 text-gray-800">
+            {% for element in pcs_elements[stage] %}
+            {% set element_key = 'PreCanSkate ' + stage + ' - ' + element %}
+            <li>
+                <span class="skill-checkbox">
+                    {{ '✓' if data.get(element_key) }}
+                </span>
+                <span class="skill-text">{{ element }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="mt-4 pt-3 border-t border-red-300 flex justify-between items-center">
+            <p class="font-semibold text-stage-{{stage}}">PCS {{ stage }} Ribbon Awarded</p>
+            <span class="text-sm font-medium text-stage-{{stage}}">Date: <span
+                    class="inline-block w-24 border-b-2 border-dotted border-red-300">{{ data.get('Pre-CanSkate ' +
+                    stage, '') }}</span></span>
+        </div>
+    </div>
+    {% endfor %}
+</div>

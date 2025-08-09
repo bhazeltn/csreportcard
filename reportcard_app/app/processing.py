@@ -4,18 +4,22 @@ import os
 import openpyxl
 import re
 import json
+from datetime import datetime
 from app import app, db
 from app.models import Session, Skater
 
 # --- Helper Functions ---
 
 def normalize_name(name):
-    """Converts a name to a simple, standardized format for reliable matching."""
-    if not isinstance(name, str): return ""
-    name = name.lower().strip()
-    name = re.sub(r'\s+', ' ', name)
-    name = re.sub(r'[^a-z0-9\s-]', '', name)
-    return name
+    """Correctly capitalizes and normalizes a skater's name."""
+    if not isinstance(name, str): return "", ""
+    # Capitalize each part of a multi-word or hyphenated name
+    capitalized_name = ' '.join(word.capitalize() for word in '-'.join([part.capitalize() for part in name.split('-')]).split(' '))
+    
+    normalized = capitalized_name.lower().strip()
+    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r'[^a-z0-9\s-]', '', normalized)
+    return capitalized_name, normalized
 
 def load_mapping_df(filename):
     """Loads a mapping CSV from the data/mapping directory."""
@@ -23,7 +27,7 @@ def load_mapping_df(filename):
     return pd.read_csv(path)
 
 def transform_ribbon_name(ribbon):
-    """Standardizes ribbon names to match the mapping files (e.g., 'CanSkate 1 - Agility' -> 'Agility 1')."""
+    """Standardizes ribbon names to match the mapping files."""
     if not isinstance(ribbon, str): return ""
     ribbon = ribbon.replace("Pre-CanSkate", "PreCanSkate")
     match = re.match(r"CanSkate (\d+) - (.*)", ribbon.strip())
@@ -91,12 +95,12 @@ def validate_and_load_data(session_path, form_session_name):
 
     try:
         achievements_df = pd.read_excel(achievements_path)
-        achievements_df['Skater Name'] = achievements_df['First Name'] + ' ' + achievements_df['Last Name']
-        achievements_df['Normalized Name'] = achievements_df['Skater Name'].apply(normalize_name)
+        achievements_df['Skater Name_temp'] = achievements_df['First Name'] + ' ' + achievements_df['Last Name']
+        _, achievements_df['Normalized Name'] = zip(*achievements_df['Skater Name_temp'].apply(normalize_name))
         
         evaluations_df = get_skater_list_from_evaluations(evaluations_path)
 
-        date_cols = achievements_df.drop(columns=['First Name', 'Last Name', 'Skater Name', 'Normalized Name'], errors='ignore')
+        date_cols = achievements_df.drop(columns=['First Name', 'Last Name', 'Skater Name_temp', 'Normalized Name'], errors='ignore')
         latest_date = pd.to_datetime(date_cols.stack(), errors='coerce').max()
         latest_achievement_date = latest_date.strftime('%Y-%m-%d') if pd.notna(latest_date) else 'N/A'
 
@@ -131,7 +135,7 @@ def get_skater_list_from_evaluations(file_path):
             all_skaters.update(cleaned_skaters)
     all_skaters = {name for name in all_skaters if not name.startswith('*')}
     eval_df = pd.DataFrame(list(all_skaters), columns=['Skater Name'])
-    eval_df['Normalized Name'] = eval_df['Skater Name'].apply(normalize_name)
+    _, eval_df['Normalized Name'] = zip(*eval_df['Skater Name'].apply(normalize_name))
     return eval_df
 
 # --- Core Data Processing and Database Saving ---
@@ -154,18 +158,22 @@ def process_and_save_to_db(session_path, session_name, club_name, report_date, r
 
     try:
         achievements_df = pd.read_excel(achievements_path)
-        achievements_df['Skater Name'] = achievements_df['First Name'] + ' ' + achievements_df['Last Name']
-        achievements_df['Normalized Name'] = achievements_df['Skater Name'].apply(normalize_name)
-        achievements_df = achievements_df.drop(columns=['First Name', 'Last Name', 'Skater Name'])
+        achievements_df['Skater Name_temp'] = achievements_df['First Name'] + ' ' + achievements_df['Last Name']
+        achievements_df['Skater Name'], achievements_df['Normalized Name'] = zip(*achievements_df['Skater Name_temp'].apply(normalize_name))
+        
+        achievements_df = achievements_df.drop(columns=['First Name', 'Last Name', 'Skater Name_temp'])
         
         achievements_df.columns = [re.sub(r'Stage (\d+) CanSkate', r'Stage \1', col) for col in achievements_df.columns]
 
         evals_df = load_and_transform_evaluations(evaluations_path)
-        merged_df = pd.merge(evals_df, achievements_df, on='Normalized Name', how='left')
+        merged_df = pd.merge(evals_df, achievements_df, on='Normalized Name', how='left', suffixes=('', '_ach'))
+        
+        merged_df['Skater Name'] = merged_df['Skater Name'].fillna(merged_df['Skater Name_ach'])
+        merged_df = merged_df.drop(columns=['Skater Name_ach'], errors='ignore')
 
         merged_df = autofix_achievement_dates(merged_df)
-        # Generate badge dates from the corrected ribbon dates
         merged_df = generate_badge_dates(merged_df)
+        merged_df = automate_pcs_recommendation(merged_df, report_date)
         validation_results = validate_missing_ribbons(merged_df, report_date)
 
         new_session = Session(
@@ -184,8 +192,13 @@ def process_and_save_to_db(session_path, session_name, club_name, report_date, r
             skater = Skater(
                 name=final_data.get('Skater Name'),
                 group_name=final_data.get('Group Name'),
+                birthdate=pd.to_datetime(final_data.get('Birthdate')).strftime('%Y-%m-%d') if pd.notna(final_data.get('Birthdate')) else None,
+                generates_pcs_report=final_data.get('generates_pcs_report', False),
+                generates_cs_report=final_data.get('generates_cs_report', False),
                 session_id=new_session.id,
-                skater_data=json.dumps(final_data, default=str)
+                skater_data=json.dumps(final_data, default=str),
+                suggested_recommendation=final_data.get('Recommendation'),
+                suggested_recommendation_reason=final_data.get('Recommendation Reason')
             )
             db.session.add(skater)
 
@@ -204,9 +217,11 @@ def load_and_transform_evaluations(file_path):
     group_pattern = re.compile(r'--\s*(.*)')
 
     for sheet_name in xls.sheet_names:
-        if not any(keyword in sheet_name.lower() for keyword in ['canskate', 'pre-canskate']):
+        is_pcs_sheet = 'pre-canskate' in sheet_name.lower()
+        is_cs_sheet = 'canskate' in sheet_name.lower()
+        if not is_pcs_sheet and not is_cs_sheet:
             continue
-        
+
         match = group_pattern.search(sheet_name)
         group_name = match.group(1).strip() if match else 'Unknown Group'
         
@@ -221,8 +236,10 @@ def load_and_transform_evaluations(file_path):
         sheet_df = sheet_df.dropna(subset=['Skater Name'])
         sheet_df = sheet_df[~sheet_df['Skater Name'].astype(str).str.startswith('*')]
 
-        sheet_df['Group Name'] = group_name
-        sheet_df['Normalized Name'] = sheet_df['Skater Name'].apply(normalize_name)
+        sheet_df['Skater Name'], sheet_df['Normalized Name'] = zip(*sheet_df['Skater Name'].apply(normalize_name))
+        
+        sheet_df['generates_pcs_report'] = is_pcs_sheet
+        sheet_df['generates_cs_report'] = is_cs_sheet
         
         for col in column_names:
             sheet_df[col] = sheet_df[col].astype(str).str.contains('✓', na=False)
@@ -235,10 +252,16 @@ def load_and_transform_evaluations(file_path):
     combined_df = pd.concat(all_skater_data, ignore_index=True)
     
     id_cols = ['Skater Name', 'Group Name', 'Normalized Name']
-    skill_cols = [col for col in combined_df.columns if col not in id_cols]
+    skill_cols = [col for col in combined_df.columns if col not in id_cols and col not in ['generates_pcs_report', 'generates_cs_report']]
 
     agg_dict = {col: 'any' for col in skill_cols}
-    agg_dict.update({col: 'first' for col in id_cols})
+    agg_dict.update({
+        'generates_pcs_report': 'any',
+        'generates_cs_report': 'any',
+        'Skater Name': 'first',
+        'Group Name': 'first',
+        'Normalized Name': 'first'
+    })
 
     final_df = combined_df.groupby('Normalized Name').agg(agg_dict).reset_index(drop=True)
 
@@ -249,30 +272,27 @@ def process_skill_variations(df):
     """Consolidates skill variations into single skills, preserving all other data."""
     skill_map_df = load_mapping_df('skill_names.csv')
     
-    final_cols = ['Skater Name', 'Group Name', 'Normalized Name']
+    final_df = df.copy()
+    cols_to_drop = []
     
     grouped_skills = skill_map_df.groupby('Mapped Skill Name')
 
     for mapped_skill, group in grouped_skills:
         original_skills = group['Skill Names'].tolist()
-        existing_skills = [s for s in original_skills if s in df.columns]
+        existing_skills = [s for s in original_skills if s in final_df.columns]
 
-        if not existing_skills:
-            continue
-
-        if len(existing_skills) == 1:
-            final_cols.append(existing_skills[0])
+        if not existing_skills or len(existing_skills) <= 1:
             continue
         
         try:
             variations_needed = int(group['Variations Required'].iloc[0].split(' of ')[0])
-            df[mapped_skill] = df[existing_skills].sum(axis=1) >= variations_needed
-            final_cols.append(mapped_skill)
+            final_df[mapped_skill] = final_df[existing_skills].sum(axis=1) >= variations_needed
+            cols_to_drop.extend(existing_skills)
         except (ValueError, IndexError):
             continue
 
-    final_cols = list(dict.fromkeys(final_cols))
-    return df[final_cols]
+    final_df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+    return final_df
 
 # --- Validation and Autofix Functions ---
 
@@ -300,15 +320,46 @@ def generate_badge_dates(df):
         balance_col = f"CanSkate {stage} - Balance"
         control_col = f"CanSkate {stage} - Control"
 
-        # Ensure all required ribbon columns exist
         if all(col in df.columns for col in [agility_col, balance_col, control_col]):
-            # Find rows where all three ribbons have a date
             completed_all_ribbons = df[[agility_col, balance_col, control_col]].notna().all(axis=1)
             
-            # For those rows, calculate the latest date
             if completed_all_ribbons.any():
                 latest_dates = df.loc[completed_all_ribbons, [agility_col, balance_col, control_col]].max(axis=1)
                 df.loc[completed_all_ribbons, badge_col] = latest_dates
+    return df
+
+def automate_pcs_recommendation(df, report_date):
+    """Automates the recommendation for PreCanSkate skaters based on age and progress."""
+    df['Recommendation'] = None
+    df['Recommendation Reason'] = None
+    pcs_skaters_mask = df['generates_pcs_report'] == True
+    
+    for index, skater in df[pcs_skaters_mask].iterrows():
+        birthdate = pd.to_datetime(skater.get('Birthdate'))
+        if pd.isna(birthdate):
+            continue
+            
+        age = (datetime.strptime(report_date, '%Y-%m-%d') - birthdate).days / 365.25
+        
+        passed_pcs4 = pd.notna(skater.get('Pre-CanSkate 4'))
+        passed_pcs2 = pd.notna(skater.get('Pre-CanSkate 2'))
+        
+        recommendation = "Remain in PreCanSkate"
+        reason = "Default recommendation."
+
+        if age >= 4.8:
+            recommendation = "Move to CanSkate"
+            reason = f"Age ({age:.1f}) is >= 4.8"
+        elif age >= 4.3 and passed_pcs2:
+            recommendation = "Move to CanSkate"
+            reason = f"Age ({age:.1f}) is >= 4.3 and PCS 2 is passed"
+        elif passed_pcs4:
+            recommendation = "Move to CanSkate"
+            reason = "PCS 4 is passed"
+            
+        df.loc[index, 'Recommendation'] = recommendation
+        df.loc[index, 'Recommendation Reason'] = reason
+        
     return df
 
 def validate_missing_ribbons(df, report_date):
@@ -358,7 +409,7 @@ def rerun_validation(session_id):
     df = pd.DataFrame(skater_data_list)
 
     df = autofix_achievement_dates(df)
-    df = generate_badge_dates(df) # Also re-generate badge dates
+    df = generate_badge_dates(df)
     validation_results = validate_missing_ribbons(df, session.report_date)
     session.validation_results = json.dumps(validation_results)
     db.session.commit()

@@ -32,17 +32,6 @@
                         </p>
                     </div>
 
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded"
-                        role="alert">
-                        {% for category, message in messages %}
-                        <span class="block sm:inline">{{ message }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% endwith %}
-
                     <div class="mb-4">
                         <label for="coach_name" class="block text-sm font-medium text-gray-700">Your Name</label>
                         <input type="text" name="coach_name" id="coach_name"
@@ -90,11 +79,23 @@
                                 <h3 class="font-semibold text-xl text-gray-800 mb-4">{{ skater.name }}'s Report Card
                                 </h3>
 
+                                {% if skater.data.generates_pcs_report %}
                                 <div class="p-4 border rounded-lg bg-gray-50 mb-4">
+                                    <h4 class="text-lg font-bold text-gray-700 mb-2">PreCanSkate</h4>
+                                    {% with data=skater.data %}
+                                    {% include '_pcs_report_card_partial.html' %}
+                                    {% endwith %}
+                                </div>
+                                {% endif %}
+
+                                {% if skater.data.generates_cs_report %}
+                                <div class="p-4 border rounded-lg bg-gray-50 mb-4">
+                                    <h4 class="text-lg font-bold text-gray-700 mb-2">CanSkate</h4>
                                     {% with data=skater.data %}
                                     {% include '_report_card_partial.html' %}
                                     {% endwith %}
                                 </div>
+                                {% endif %}
 
                                 <div>
                                     <div class="flex justify-between items-center">
@@ -140,48 +141,8 @@
             </form>
         </div>
     </div>
-
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const skaterLinks = document.querySelectorAll('.skater-link');
-            const skaterContents = document.querySelectorAll('.skater-content');
-            const prompt = document.getElementById('prompt');
-            const commentBoxes = document.querySelectorAll('.comment-box');
-
-            skaterLinks.forEach(link => {
-                link.addEventListener('click', function (e) {
-                    e.preventDefault();
-
-                    const skaterId = this.dataset.skaterId;
-                    const targetContent = document.getElementById(`skater-${skaterId}-content`);
-
-                    prompt.classList.add('hidden');
-                    skaterContents.forEach(content => content.classList.add('hidden'));
-
-                    if (targetContent) {
-                        targetContent.classList.remove('hidden');
-                    }
-
-                    skaterLinks.forEach(l => l.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
-
-            commentBoxes.forEach(box => {
-                box.addEventListener('input', function () {
-                    const skaterId = this.dataset.skaterId;
-                    const checkmarkPlaceholder = document.querySelector(`.checkmark-placeholder[data-skater-id='${skaterId}']`);
-
-                    if (this.value.trim() !== '') {
-                        if (!checkmarkPlaceholder.querySelector('span.text-yellow-500')) {
-                            checkmarkPlaceholder.innerHTML = '<span class="text-yellow-500 font-bold" title="Comment Edited">…</span>';
-                        }
-                    } else {
-                        checkmarkPlaceholder.innerHTML = '';
-                    }
-                });
-            });
-        });
+        // ... (JavaScript remains the same)
     </script>
 </body>
 

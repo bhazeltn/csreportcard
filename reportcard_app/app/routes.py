@@ -129,10 +129,18 @@ def session_detail(session_id):
 
 @app.route('/skater/<int:skater_id>/report')
 def skater_report_card(skater_id):
-    """Displays a basic HTML version of a skater's report card."""
+    """Displays a basic HTML version of a skater's CanSkate report card."""
     skater = Skater.query.get_or_404(skater_id)
     skater_data = json.loads(skater.skater_data)
     return render_template('skater_report_card.html', skater=skater, data=skater_data)
+
+@app.route('/skater/<int:skater_id>/pcs_report')
+def pcs_report_card(skater_id):
+    """Displays the custom HTML PreCanSkate report card."""
+    skater = Skater.query.get_or_404(skater_id)
+    skater_data = json.loads(skater.skater_data)
+    session_obj = skater.session
+    return render_template('pcs_report_card.html', skater=skater, data=skater_data, session=session_obj)
 
 @app.route('/generate_magic_link', methods=['POST'])
 def generate_magic_link():
