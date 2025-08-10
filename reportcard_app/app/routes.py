@@ -127,6 +127,20 @@ def session_detail(session_id):
         
     return render_template('session_detail.html', session=session_obj, skaters_by_group=skaters_by_group)
 
+@app.route('/session/<int:session_id>/delete', methods=['POST'])
+def delete_session(session_id):
+    """Deletes a session and all associated data."""
+    session_to_delete = Session.query.get_or_404(session_id)
+    try:
+        db.session.delete(session_to_delete)
+        db.session.commit()
+        flash(f"Session '{session_to_delete.name}' has been successfully deleted.", 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting session {session_id}: {e}")
+        flash('An error occurred while trying to delete the session.', 'error')
+    return redirect(url_for('dashboard'))
+
 @app.route('/skater/<int:skater_id>/report')
 def skater_report_card(skater_id):
     """Displays a basic HTML version of a skater's CanSkate report card."""

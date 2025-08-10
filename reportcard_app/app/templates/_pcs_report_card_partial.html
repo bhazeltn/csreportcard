@@ -1,34 +1,202 @@
-<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-    {% set pcs_elements = {
-    '1': ["Fall down", "Stationary balance with eye focus", "Smile", "Stationary toe touch", "March on the spot"],
-    '2': ["Fall down - Get up (with pylon)", "FWD walking/skating (5+ steps)", "Walk around in circle", "Stationary
-    \"V\" position", "Stationary 1-foot balance (R/L)", "Side Steps (5+ steps, both directions)"],
-    '3': ["Fall down - Get up (unassisted)", "FWD walking/skating with speed", "BWD walking/skating (5+ steps)", "FWD
-    2-foot glide (2+ counts)", "Stationary 2-foot jump", "Stationary 2-foot ¼ turns"],
-    '4': ["Make snow (R/L/both feet)", "FWD skating (½ perimeter)", "BWD walking/skating with speed", "FWD 2-foot
-    sit-glide (2+ counts)", "FWD glide turn", "FWD skating with turn to BWD"]
-    } %}
+<!DOCTYPE html>
+<html lang="en">
 
-    {% for stage in ['1', '2', '3', '4'] %}
-    <div class="bg-stage-{{stage}} border-l-8 border-stage-{{stage}} rounded-lg p-4 shadow-md">
-        <h3 class="text-xl font-bold text-stage-{{stage}} mb-3">PreCanSkate {{ stage }}</h3>
-        <ul class="space-y-2 text-gray-800">
-            {% for element in pcs_elements[stage] %}
-            {% set element_key = 'PreCanSkate ' + stage + ' - ' + element %}
-            <li>
-                <span class="skill-checkbox">
-                    {{ '✓' if data.get(element_key) }}
-                </span>
-                <span class="skill-text">{{ element }}</span>
-            </li>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pre-CanSkate Progress Report for {{ skater.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-print-color-adjust: exact;
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
+
+        .skill-checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            border: 2px solid #94a3b8;
+            /* slate-400 */
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: bold;
+            color: #16a34a;
+            /* green-600 */
+        }
+
+        .skill-text {
+            vertical-align: middle;
+        }
+
+        .bg-stage-1 {
+            background-color: #fee2e2;
+        }
+
+        .border-stage-1 {
+            border-color: #ef4444;
+        }
+
+        .text-stage-1 {
+            color: #991b1b;
+        }
+
+        .bg-stage-2 {
+            background-color: #dbeafe;
+        }
+
+        .border-stage-2 {
+            border-color: #3b82f6;
+        }
+
+        .text-stage-2 {
+            color: #1e40af;
+        }
+
+        .bg-stage-3 {
+            background-color: #ecfccb;
+        }
+
+        .border-stage-3 {
+            border-color: #84cc16;
+        }
+
+        .text-stage-3 {
+            color: #3f6212;
+        }
+
+        .bg-stage-4 {
+            background-color: #fef9c3;
+        }
+
+        .border-stage-4 {
+            border-color: #eab308;
+        }
+
+        .text-stage-4 {
+            color: #854d0e;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-200 p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white p-6 sm:p-10 shadow-lg rounded-lg">
+
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8 pb-6 border-b-2 border-gray-200">
+            <div class="w-48">
+                <img src="https://placehold.co/192x78/ffffff/000000?text=Derrick+Skating+Club"
+                    alt="Derrick Skating Club Logo" class="max-h-24 max-w-full object-contain">
+            </div>
+            <div class="text-center">
+                <h1 class="text-4xl sm:text-5xl font-bold text-gray-800" style="color: #E4002B;">Pre-CanSkate</h1>
+                <h2 class="text-3xl sm:text-4xl font-semibold text-gray-600">Progress Report</h2>
+            </div>
+            <div class="w-48">
+                <img src="https://placehold.co/192x55/E4002B/ffffff?text=Skate+Canada" alt="Skate Canada Logo"
+                    class="w-full h-auto">
+            </div>
+        </header>
+
+        <!-- Skater Information -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 text-lg">
+            <div class="sm:col-span-2">
+                <span class="font-semibold text-gray-700">Skater's Name:</span>
+                <span class="border-b-2 border-dotted border-gray-400 w-full inline-block">{{ skater.name }}</span>
+            </div>
+            <div>
+                <span class="font-semibold text-gray-700">Date:</span>
+                <span class="border-b-2 border-dotted border-gray-400 w-full inline-block">{{ session.report_date
+                    }}</span>
+            </div>
+        </section>
+
+        <!-- Skills Grid -->
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {% set pcs_elements = {
+            '1': ["Fall down", "Stationary balance with eye focus", "Smile", "Stationary toe touch", "March on the
+            spot"],
+            '2': ["Fall down - Get up (with pylon)", "FWD walking/skating (5+ steps)", "Walk around in circle",
+            "Stationary \"V\" position", "Stationary 1-foot balance (R/L)", "Side Steps (5+ steps, both directions)"],
+            '3': ["Fall down - Get up (unassisted)", "FWD walking/skating with speed", "BWD walking/skating (5+ steps)",
+            "FWD 2-foot glide (2+ counts)", "Stationary 2-foot jump", "Stationary 2-foot ¼ turns"],
+            '4': ["Make snow (R/L/both feet)", "FWD skating (½ perimeter)", "BWD walking/skating with speed", "FWD
+            2-foot sit-glide (2+ counts)", "FWD glide turn", "FWD skating with turn to BWD"]
+            } %}
+
+            {% for stage in ['1', '2', '3', '4'] %}
+            <div class="bg-stage-{{stage}} border-l-8 border-stage-{{stage}} rounded-lg p-4 shadow-md">
+                <h3 class="text-xl font-bold text-stage-{{stage}} mb-3">Pre-CanSkate {{ stage }}</h3>
+                <ul class="space-y-2 text-gray-800">
+                    {% for element in pcs_elements[stage] %}
+                    {% set element_key = 'PreCanSkate ' + stage + ' - ' + element %}
+                    <li>
+                        <span class="skill-checkbox">
+                            {% if data.get(element_key) %}✓{% endif %}
+                        </span>
+                        <span class="skill-text">{{ element }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="mt-4 pt-3 border-t border-red-300 flex justify-between items-center">
+                    <p class="font-semibold text-stage-{{stage}}">PCS {{ stage }} Ribbon Awarded</p>
+                    {% set ribbon_key = 'Pre-CanSkate ' + stage %}
+                    <span class="text-sm font-medium text-stage-{{stage}}">Date: <span
+                            class="inline-block w-24 border-b-2 border-dotted border-red-300">{{ data.get(ribbon_key,
+                            '') }}</span></span>
+                </div>
+            </div>
             {% endfor %}
-        </ul>
-        <div class="mt-4 pt-3 border-t border-red-300 flex justify-between items-center">
-            <p class="font-semibold text-stage-{{stage}}">PCS {{ stage }} Ribbon Awarded</p>
-            <span class="text-sm font-medium text-stage-{{stage}}">Date: <span
-                    class="inline-block w-24 border-b-2 border-dotted border-red-300">{{ data.get('Pre-CanSkate ' +
-                    stage, '') }}</span></span>
-        </div>
+        </main>
+
+        <!-- Comments and Recommendations -->
+        <section class="mt-10">
+            <div class="mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Coach's Comments</h3>
+                <div class="w-full min-h-[10rem] bg-gray-50 rounded-lg p-2 border border-gray-300 whitespace-pre-wrap">
+                    {{ skater.coach_comments or '' }}</div>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Register in...</h3>
+                <div class="flex items-center space-x-8 text-lg">
+                    <div>
+                        <span class="skill-checkbox">{% if skater.recommendation == 'Remain in PreCanSkate' %}✓{% endif
+                            %}</span>
+                        <span class="skill-text">Pre-CanSkate</span>
+                    </div>
+                    <div>
+                        <span class="skill-checkbox">{% if skater.recommendation == 'Move to CanSkate' %}✓{% endif
+                            %}</span>
+                        <span class="skill-text">CanSkate</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer with Contact Info -->
+        <footer class="mt-12 pt-6 border-t-2 border-gray-300 text-center">
+            <p class="text-sm text-gray-600">For more information or to register, please visit:</p>
+            <p class="font-semibold" style="color: #0693E3;">www.derrickskating.ca</p>
+            <p class="text-sm text-gray-600 mt-1">or email <span class="font-semibold"
+                    style="color: #0693E3;">office@derrickskating.ca</span></p>
+        </footer>
     </div>
-    {% endfor %}
-</div>
+</body>
+
+</html>

@@ -130,14 +130,37 @@
         <!-- Skills Grid -->
         <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
             {% set pcs_elements = {
-            '1': ["Fall down", "Stationary balance with eye focus", "Smile", "Stationary toe touch", "March on the
-            spot"],
-            '2': ["Fall down - Get up (with pylon)", "FWD walking/skating (5+ steps)", "Walk around in circle",
-            "Stationary \"V\" position", "Stationary 1-foot balance (R/L)", "Side Steps (5+ steps, both directions)"],
-            '3': ["Fall down - Get up (unassisted)", "FWD walking/skating with speed", "BWD walking/skating (5+ steps)",
-            "FWD 2-foot glide (2+ counts)", "Stationary 2-foot jump", "Stationary 2-foot ¼ turns"],
-            '4': ["Make snow (R/L/both feet)", "FWD skating (½ perimeter)", "BWD walking/skating with speed", "FWD
-            2-foot sit-glide (2+ counts)", "FWD glide turn", "FWD skating with turn to BWD"]
+            '1': [
+            {'code': 'CPC01', 'text': 'Fall down'},
+            {'code': 'CPC02', 'text': 'Stationary balance with eye focus'},
+            {'code': 'CPC03', 'text': 'Smile'},
+            {'code': 'CPC04', 'text': 'Stationary toe touch'},
+            {'code': 'CPC05', 'text': 'March on the spot'}
+            ],
+            '2': [
+            {'code': 'CPC06', 'text': 'Fall down - Get up (with assistance of pylon)'},
+            {'code': 'CPC07', 'text': 'FWD walking/skating (5+ steps)'},
+            {'code': 'CPC08', 'text': 'Walk around in circle'},
+            {'code': 'CPC09', 'text': 'Stationary "V" position'},
+            {'code': 'CPC10', 'text': 'Stationary 1-foot balance (R/L, 2+ counts)'},
+            {'code': 'CPC11', 'text': 'Side steps (5+ steps, both directions)'}
+            ],
+            '3': [
+            {'code': 'CPC12', 'text': 'Fall down - Get up (unassisted, 90% of attempts)'},
+            {'code': 'CPC13', 'text': 'FWD walking/skating with speed (1/2 width ice)'},
+            {'code': 'CPC14', 'text': 'BWD walking/skating (5+ steps)'},
+            {'code': 'CPC15', 'text': 'FWD 2-foot glide (2+ counts)'},
+            {'code': 'CPC16', 'text': 'Stationary 2-foot jump'},
+            {'code': 'CPC17', 'text': 'Stationary 2-foot 1/4 turns'}
+            ],
+            '4': [
+            {'code': 'CPC18', 'text': 'Make snow (R/L/both feet)'},
+            {'code': 'CPC19', 'text': 'FWD skating (1/2 perimeter)'},
+            {'code': 'CPC20', 'text': 'BWD walking/skating with speed (1/2 width ice)'},
+            {'code': 'CPC21', 'text': 'FWD 2-foot sit-glide (2+ counts)'},
+            {'code': 'CPC22', 'text': 'FWD glide turn'},
+            {'code': 'CPC23', 'text': 'FWD skating with turn to BWD'}
+            ]
             } %}
 
             {% for stage in ['1', '2', '3', '4'] %}
@@ -147,17 +170,17 @@
                     {% for element in pcs_elements[stage] %}
                     <li>
                         <span class="skill-checkbox">
-                            {{ '✓' if data['PreCanSkate ' + stage + ' - ' + element] }}
+                            {{ '✓' if data.get(element.code) }}
                         </span>
-                        <span class="skill-text">{{ element }}</span>
+                        <span class="skill-text">{{ element.text }}</span>
                     </li>
                     {% endfor %}
                 </ul>
                 <div class="mt-4 pt-3 border-t border-red-300 flex justify-between items-center">
                     <p class="font-semibold text-stage-{{stage}}">PCS {{ stage }} Ribbon Awarded</p>
                     <span class="text-sm font-medium text-stage-{{stage}}">Date: <span
-                            class="inline-block w-24 border-b-2 border-dotted border-red-300">{{ data['Pre-CanSkate ' +
-                            stage] or '' }}</span></span>
+                            class="inline-block w-24 border-b-2 border-dotted border-red-300">{{ data.get('Pre-CanSkate
+                            ' + stage, '') }}</span></span>
                 </div>
             </div>
             {% endfor %}

@@ -10,15 +10,28 @@ from app.models import Session, Skater
 
 # --- Helper Functions ---
 
+def smart_capitalize(s):
+    """Capitalizes the first letter of a string without affecting the rest."""
+    if not s:
+        return ""
+    return s[0].upper() + s[1:]
+
 def normalize_name(name):
-    """Correctly capitalizes and normalizes a skater's name."""
-    if not isinstance(name, str): return "", ""
-    # Capitalize each part of a multi-word or hyphenated name
-    capitalized_name = ' '.join(word.capitalize() for word in '-'.join([part.capitalize() for part in name.split('-')]).split(' '))
-    
+    """
+    Correctly capitalizes and normalizes a skater's name, handling
+    spaces, hyphens, and multiple capital letters.
+    """
+    if not isinstance(name, str):
+        return "", ""
+
+    def capitalize_hyphenated(part):
+        return '-'.join([smart_capitalize(sub) for sub in part.split('-')])
+
+    capitalized_name = ' '.join([capitalize_hyphenated(word) for word in name.split()])
     normalized = capitalized_name.lower().strip()
     normalized = re.sub(r'\s+', ' ', normalized)
     normalized = re.sub(r'[^a-z0-9\s-]', '', normalized)
+    
     return capitalized_name, normalized
 
 def load_mapping_df(filename):
@@ -29,10 +42,15 @@ def load_mapping_df(filename):
 def transform_ribbon_name(ribbon):
     """Standardizes ribbon names to match the mapping files."""
     if not isinstance(ribbon, str): return ""
-    ribbon = ribbon.replace("Pre-CanSkate", "PreCanSkate")
-    match = re.match(r"CanSkate (\d+) - (.*)", ribbon.strip())
-    if match:
-        return f"{match.group(2).strip()} {match.group(1).strip()}"
+    
+    pcs_match = re.search(r'Pre-CanSkate (\d+)', ribbon)
+    if pcs_match:
+        return f"PreCanSkate {pcs_match.group(1)}"
+
+    cs_match = re.match(r"CanSkate (\d+) - (.*)", ribbon.strip())
+    if cs_match:
+        return f"{cs_match.group(2).strip()} {cs_match.group(1).strip()}"
+        
     return ribbon.strip()
 
 # --- Report Identification and Initial Loading ---
@@ -153,8 +171,8 @@ def process_and_save_to_db(session_path, session_name, club_name, report_date, r
     upload1_path = os.path.join(session_path, 'upload1.xlsx')
     upload2_path = os.path.join(session_path, 'upload2.xlsx')
     
-    achievements_path = upload1_path if identify_report_type(upload1_path) == 'Achievements' else file2_path
-    evaluations_path = upload2_path if identify_report_type(upload1_path) == 'Achievements' else file1_path
+    achievements_path = upload1_path if identify_report_type(upload1_path) == 'Achievements' else upload2_path
+    evaluations_path = upload2_path if identify_report_type(upload2_path) == 'Achievements' else upload1_path
 
     try:
         achievements_df = pd.read_excel(achievements_path)
@@ -215,6 +233,9 @@ def load_and_transform_evaluations(file_path):
     xls = pd.ExcelFile(file_path)
     all_skater_data = []
     group_pattern = re.compile(r'--\s*(.*)')
+    
+    mapping_df = load_mapping_df('report_card_mapping.csv')
+    skill_mapping = dict(zip(mapping_df['Our Name'], mapping_df['Report Card Name']))
 
     for sheet_name in xls.sheet_names:
         is_pcs_sheet = 'pre-canskate' in sheet_name.lower()
@@ -227,21 +248,25 @@ def load_and_transform_evaluations(file_path):
         
         header_df = pd.read_excel(xls, sheet_name=sheet_name, header=None, nrows=3)
         ribbon_names_raw = header_df.iloc[1, 1:].ffill()
-        skill_names = header_df.iloc[2, 1:]
+        skill_names_raw = header_df.iloc[2, 1:]
         
-        column_names = [f"{transform_ribbon_name(ribbon)} - {str(skill).strip()}" for ribbon, skill in zip(ribbon_names_raw, skill_names)]
+        raw_column_names = [f"{transform_ribbon_name(ribbon)} - {str(skill).strip()}" for ribbon, skill in zip(ribbon_names_raw, skill_names_raw)]
+        
+        mapped_column_names = [skill_mapping.get(name, name) for name in raw_column_names]
 
         sheet_df = pd.read_excel(xls, sheet_name=sheet_name, header=None, skiprows=3)
-        sheet_df.columns = ['Skater Name'] + column_names
+        sheet_df.columns = ['Skater Name'] + mapped_column_names
+        
         sheet_df = sheet_df.dropna(subset=['Skater Name'])
         sheet_df = sheet_df[~sheet_df['Skater Name'].astype(str).str.startswith('*')]
 
         sheet_df['Skater Name'], sheet_df['Normalized Name'] = zip(*sheet_df['Skater Name'].apply(normalize_name))
+        sheet_df['Group Name'] = group_name
         
         sheet_df['generates_pcs_report'] = is_pcs_sheet
         sheet_df['generates_cs_report'] = is_cs_sheet
         
-        for col in column_names:
+        for col in mapped_column_names:
             sheet_df[col] = sheet_df[col].astype(str).str.contains('✓', na=False)
 
         all_skater_data.append(sheet_df)
@@ -259,11 +284,11 @@ def load_and_transform_evaluations(file_path):
         'generates_pcs_report': 'any',
         'generates_cs_report': 'any',
         'Skater Name': 'first',
-        'Group Name': 'first',
-        'Normalized Name': 'first'
+        'Group Name': 'first'
     })
 
-    final_df = combined_df.groupby('Normalized Name').agg(agg_dict).reset_index(drop=True)
+    # FIX: Use as_index=False to keep 'Normalized Name' as a column after grouping
+    final_df = combined_df.groupby('Normalized Name', as_index=False).agg(agg_dict)
 
     return process_skill_variations(final_df)
 
